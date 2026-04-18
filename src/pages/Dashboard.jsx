@@ -4,6 +4,8 @@ import { clientesService } from '../services/clientes'
 import { formatMoneda, formatFecha, getMesActual, nombreMes } from '../utils/formatters'
 import MovimientoForm from '../components/MovimientoForm'
 
+const NOMBRE_MES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
 export default function Dashboard() {
   const { mes: mesActual, año: añoActual } = getMesActual()
   const [mes, setMes] = useState(mesActual)
@@ -11,7 +13,9 @@ export default function Dashboard() {
   const [resumen, setResumen] = useState({ ingresos: 0, gastos: 0, balance: 0 })
   const [ultimos, setUltimos] = useState([])
   const [clientes, setClientes] = useState([])
+  const [historial, setHistorial] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingHistorial, setLoadingHistorial] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -33,7 +37,20 @@ export default function Dashboard() {
     }
   }
 
+  const cargarHistorial = async () => {
+    setLoadingHistorial(true)
+    try {
+      const data = await movimientosService.getResumenUltimosMeses(6)
+      setHistorial(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingHistorial(false)
+    }
+  }
+
   useEffect(() => { cargar() }, [mes, año])
+  useEffect(() => { cargarHistorial() }, [])
 
   const handleCrear = async (data) => {
     setSaving(true)
@@ -41,6 +58,7 @@ export default function Dashboard() {
       await movimientosService.create(data)
       setShowForm(false)
       cargar()
+      cargarHistorial()
     } finally {
       setSaving(false)
     }
@@ -52,6 +70,11 @@ export default function Dashboard() {
   }))
 
   const años = [añoActual - 1, añoActual, añoActual + 1]
+
+  // Max value for bar chart scaling
+  const maxVal = historial.length > 0
+    ? Math.max(...historial.map(h => Math.max(h.ingresos, h.gastos)), 1)
+    : 1
 
   return (
     <div>
@@ -93,6 +116,87 @@ export default function Dashboard() {
           <div className="stat-label">Balance</div>
           <div className="stat-value">{formatMoneda(resumen.balance)}</div>
         </div>
+      </div>
+
+      {/* Historial comparativo */}
+      <div className="card" style={{marginBottom:'1.5rem'}}>
+        <h2 style={{fontFamily:'var(--font-serif)', fontSize:'1.2rem', fontWeight:400, marginBottom:'1.5rem'}}>
+          Últimos 6 meses
+        </h2>
+
+        {loadingHistorial ? (
+          <div className="loading">Cargando...</div>
+        ) : (
+          <>
+            {/* Bar chart */}
+            <div className="historial-chart">
+              {historial.map((h, i) => (
+                <div key={i} className="historial-col">
+                  <div className="historial-bars">
+                    <div
+                      className="historial-bar bar-ingreso"
+                      style={{height: `${(h.ingresos / maxVal) * 100}%`}}
+                      title={`Ingresos: ${formatMoneda(h.ingresos)}`}
+                    />
+                    <div
+                      className="historial-bar bar-gasto"
+                      style={{height: `${(h.gastos / maxVal) * 100}%`}}
+                      title={`Gastos: ${formatMoneda(h.gastos)}`}
+                    />
+                  </div>
+                  <div className="historial-mes-label">
+                    {NOMBRE_MES_CORTO[h.mes - 1]}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Legend */}
+            <div className="historial-legend">
+              <span className="historial-legend-item ingreso">Ingresos</span>
+              <span className="historial-legend-item gasto">Gastos</span>
+            </div>
+
+            {/* Table */}
+            <div className="table-container" style={{marginTop:'1.25rem'}}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th style={{textAlign:'right'}}>Ingresos</th>
+                    <th style={{textAlign:'right'}}>Gastos</th>
+                    <th style={{textAlign:'right'}}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...historial].reverse().map((h, i) => (
+                    <tr key={i}>
+                      <td style={{textTransform:'capitalize', fontWeight: h.mes === mesActual && h.año === añoActual ? 500 : 400}}>
+                        {h.mes === mesActual && h.año === añoActual
+                          ? <span style={{color:'var(--accent-gold-light)'}}>● </span>
+                          : null
+                        }
+                        {NOMBRE_MES_CORTO[h.mes - 1]} {h.año}
+                      </td>
+                      <td style={{textAlign:'right'}} className="monto-ingreso">
+                        {h.ingresos > 0 ? formatMoneda(h.ingresos) : <span style={{color:'var(--text-dim)'}}>—</span>}
+                      </td>
+                      <td style={{textAlign:'right'}} className="monto-gasto">
+                        {h.gastos > 0 ? formatMoneda(h.gastos) : <span style={{color:'var(--text-dim)'}}>—</span>}
+                      </td>
+                      <td style={{textAlign:'right'}} className={h.balance >= 0 ? 'monto-ingreso' : 'monto-gasto'}>
+                        {h.ingresos === 0 && h.gastos === 0
+                          ? <span style={{color:'var(--text-dim)'}}>—</span>
+                          : (h.balance >= 0 ? '+' : '−') + formatMoneda(Math.abs(h.balance))
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card">

@@ -52,6 +52,33 @@ export const movimientosService = {
     if (error) throw error
   },
 
+  async getResumenUltimosMeses(cantidad = 6) {
+    const resultados = []
+    const hoy = new Date()
+
+    for (let i = cantidad - 1; i >= 0; i--) {
+      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
+      const mes = fecha.getMonth() + 1
+      const año = fecha.getFullYear()
+      const inicio = `${año}-${String(mes).padStart(2, '0')}-01`
+      const fin = new Date(año, mes, 0).toISOString().split('T')[0]
+
+      const { data, error } = await supabase
+        .from('movimientos')
+        .select('tipo, monto')
+        .gte('fecha', inicio)
+        .lte('fecha', fin)
+
+      if (error) throw error
+
+      const ingresos = data.filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + Number(m.monto), 0)
+      const gastos = data.filter(m => m.tipo === 'gasto').reduce((acc, m) => acc + Number(m.monto), 0)
+      resultados.push({ mes, año, ingresos, gastos, balance: ingresos - gastos })
+    }
+
+    return resultados
+  },
+
   async getResumenMes(mes, año) {
     const inicio = `${año}-${String(mes).padStart(2, '0')}-01`
     const fin = new Date(año, mes, 0).toISOString().split('T')[0]
