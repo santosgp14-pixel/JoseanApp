@@ -1,7 +1,8 @@
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { Routes, Route, NavLink } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import Movimientos from './pages/Movimientos'
 import Clientes from './pages/Clientes'
+import IOSInstallBanner from './components/IOSInstallBanner'
 
 const IconDashboard = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -80,6 +81,8 @@ export default function App() {
           <span>Clientes</span>
         </NavLink>
       </nav>
+
+      <IOSInstallBanner />
     </div>
   )
 }
